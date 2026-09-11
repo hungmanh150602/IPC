@@ -494,13 +494,13 @@ Writer
   │
   │ open(O_WRONLY)
   ▼
-  BLOCK
+BLOCK
   │
-  │ chờ reader
-  │
-  ▼
-Reader xuất hiện
+  │ wait reader
   │
   ▼
-open() hoàn tất
+Reader appear
+  │
+  ▼
+open() complete
 ```
