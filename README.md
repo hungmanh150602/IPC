@@ -1,5 +1,7 @@
 # Overview
 
+![alt text](<Screenshot from 2026-09-11 15-27-51.png>)
+
 ```text
                          PROCESSES
                ┌──────────────┴──────────────┐
@@ -304,6 +306,8 @@ reading...
 ^C
 ```
 
+Why? Because the parent process has already closed both the write and read ends of the pipe, but the child process retains the write end, the kernel perceives that a writer still exists. If the child process attempts to read from the empty pipe, the `read()` function blocks the process, waiting for the writer to provide data; however, the write end is held by the child process itself. This results in the child process hanging indefinitely.
+
 ## 1.4 SIGPIPE
 
 *SIGPIPE* is a signal sent when we writing data to a pipe that has no read end.
@@ -504,3 +508,49 @@ Reader appear
   ▼
 open() complete
 ```
+
+What really happened?
+
+Writer runs to `open` command and wait there because `open` command has not yet returned the result. Then reader call `open`, at this time, there are enough writer and reader so both can continute.
+
+If we don't want to block when using `open`, we can use:
+
+```c
+open("/tmp/myfifo", O_WRONLY | O_NONBLOCK);
+```
+
+# 4. Message: System V Message Queue, POSIX Message Queue
+
+## What is **message**?
+
+First, byte stream is a sequence of individual data bytes transmitted continuously over time; it does not distinguish between message 1 and message 2.
+
+Message Queue solve this problem.
+
+## Why we need Message Queue?
+
+If we have many command such as:
+
+```text
+START
+STOP
+MOVE 100 100
+GET STATUS
+```
+
+We have create a protocol to know what message is. Example:
+
+```text
+START\n
+STOP\n
+MOVE 100 100\n
+GET STATUS\n
+```
+
+In message queues, the kernel provides an abstraction:
+
+![alt text](image-4.png)
+
+This is the reason **message queue** suitable for application that have many command, message.
+
+## 4.1 System V Message Queue

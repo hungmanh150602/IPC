@@ -1,4 +1,5 @@
 /*
+CASE ??? : test
 CASE 0: pipe
 CASE 1 : ful pipe
 CASE 2 : SIGPIPE
@@ -7,7 +8,7 @@ CASE 4 : FIFO writer
 CASE 5 : FIFO reader
 */
 
-#define CASE 5
+#define CASE 3
 
 #if CASE == 0
 #include <stdio.h>
@@ -158,7 +159,7 @@ int main(int argc, char *argv[])
     /* print out the result */
     while((fgets(buffer, sizeof(buffer), file)))
     {
-        printf("%s", buffer);
+        printf("%s\n", buffer);
     }
 
     /* close */
@@ -181,6 +182,7 @@ int main(int argc, char *argv[])
 
     const char *msg = "Hello from writer";
     write(fd, msg, strlen(msg));
+    write(fd, msg, strlen(msg));
 
     close(fd);
     return 0;
@@ -199,6 +201,25 @@ int main(int argc, char *argv[])
     buffer[n] = '\0';
 
     printf("%s\n", buffer);
+    return 0;
+}
+#else
+#include <stdio.h>
+#include <string.h>
+
+int main()
+{
+    FILE *file = fopen("document.txt", "wb");
+
+    if(file == NULL)
+    {
+        return -1;
+    }
+    const char *msg = "hehehehehe";
+
+    fwrite(msg, sizeof(char), strlen(msg), file);
+
+    fclose(file);
     return 0;
 }
 #endif
