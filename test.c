@@ -2,9 +2,12 @@
 CASE 0: pipe
 CASE 1 : ful pipe
 CASE 2 : SIGPIPE
+CASE 3 ; popen, pclose
+CASE 4 : FIFO writer
+CASE 5 : FIFO reader
 */
 
-#define CASE 2
+#define CASE 5
 
 #if CASE == 0
 #include <stdio.h>
@@ -132,6 +135,70 @@ int main(int argc, char *argv[])
     int ret = write(fd[1], msg, strlen(msg));
     printf("write done with return: %d\n", ret);
     
+    return 0;
+}
+#elif CASE == 3
+#include <stdio.h>
+
+/* using popen to run command passed via argument *argv[] */
+int main(int argc, char *argv[])
+{
+    FILE *file;
+    /* run command */
+    file = popen(argv[1], "r");
+
+    if(file == NULL)
+    {
+        perror("popen");
+        return -1;
+    }
+
+    char buffer[1024];
+
+    /* print out the result */
+    while((fgets(buffer, sizeof(buffer), file)))
+    {
+        printf("%s", buffer);
+    }
+
+    /* close */
+    pclose(file);
+    return 0;
+}
+#elif CASE == 4
+#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+
+int main(int argc, char *argv[])
+{
+    mkfifo("/tmp/myfifo", 0666);
+
+    char buffer[512];
+
+    int fd = open("/tmp/myfifo", O_WRONLY);
+
+    const char *msg = "Hello from writer";
+    write(fd, msg, strlen(msg));
+
+    close(fd);
+    return 0;
+}
+#elif CASE == 5
+#include <stdio.h>
+#include <fcntl.h>
+
+int main(int argc, char *argv[])
+{
+    char buffer[256];
+    int fd = open("/tmp/myfifo", O_RDONLY);
+
+    int n = read(fd, buffer, sizeof(buffer) - 1);
+
+    buffer[n] = '\0';
+
+    printf("%s\n", buffer);
     return 0;
 }
 #endif

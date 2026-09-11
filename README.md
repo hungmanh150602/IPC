@@ -354,4 +354,153 @@ write fail with exit signal: SIGPIPE
 write done with return; -1
 ```
 
-## 1.3 popen and pclose
+## 1.5 Deadlock
+
+If we want to establish two-way communication, we must use two pipes.
+But it can lead to deadlock.
+
+Example:
+
+```c
+/* parent write big data and read from child */
+write(fd1[1], big_data, ...);
+read(fd2[0], ...);
+
+/* child write big data and read from parent */
+write(fd2[1], big_data, ...);
+read(fd1[0], ...);
+```
+
+Both parent and child write big data to pipe before read, if it lead to full pipe, both are waiting for the other to read it. This is ***Deadlock in IPC.***
+
+# 2. popen and pclose
+
+If we want to run a command and communicate with it via pipe.
+
+`popen() = process + pipe + open`
+
+Prototype:
+
+```c
+FILE *popen (const char *command, const char *type)
+/* return:
+file pointer if OK
+NULL if error
+*/
+
+/* type:
+r: the file pointer is connected to the standard output of command
+w: the file pointer is connected to the standard input of command
+*/
+
+int pclose (FILE *stream)
+/* Returns:
+termination status of command
+or −1 on error
+*/
+```
+
+![alt text](image-2.png)  
+Result of `fp = popen(command, "r")`
+
+![alt text](image-3.png)  
+Result of `fp = popen(command, "w")`
+
+Example:
+
+```c
+/* using popen to run command passed via argument *argv[] */
+int main(int argc, char *argv[])
+{
+    FILE *file;
+    /* run command */
+    file = popen(argv[1], "r");
+
+    if(file == NULL)
+    {
+        perror("popen");
+        return -1;
+    }
+
+    char buffer[1024];
+
+    /* print out the result */
+    while((fgets(buffer, sizeof(buffer), file)))
+    {
+        printf("%s", buffer);
+    }
+
+    /* close */
+    pclose(file);
+    return 0;
+}
+```
+
+# 3. FIFOs
+
+In Linux, FIFO is a IPC called **Named Pipe**
+
+Unlike the normal pipe, FIFO has a name in filesystem.  
+`/tmp/myfifo`  
+and two processes can communicate without having the parent-child relationship.
+
+## 3.1 Create FIFO
+
+``` bash
+mkfifo /tmp/myfifo
+```
+
+check:
+
+```bash
+ls -l /tmp/myfifo
+```
+
+or use C code:
+
+```c
+#include <sys/stat.h>
+
+int mkfifo (const char *path, __mode_t mode)
+```
+
+Conceptually:
+
+```text
+Filesystem
+    │
+    └── /tmp/myfifo
+             │
+             ▼
+       Kernel FIFO object
+             │
+        ┌────┴────┐
+        ▼         ▼
+      writer     reader
+```
+
+Open FIFO:
+
+```c
+int fd = open("/tmp/myfifo", O_WRONLY); /* writer */
+
+int fd = open("/tmp/myfifo", O_RDONLY); /* reader */
+```
+
+***Writer, openning the FIFO, will typically block until the reader open the FIFO.***
+
+```text
+Writer
+  │
+  │ open(O_WRONLY)
+  ▼
+  BLOCK
+  │
+  │ chờ reader
+  │
+  ▼
+Reader xuất hiện
+  │
+  ▼
+open() hoàn tất
+```
