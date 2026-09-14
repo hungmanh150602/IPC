@@ -3,12 +3,15 @@ CASE ??? : test
 CASE 0: pipe
 CASE 1 : ful pipe
 CASE 2 : SIGPIPE
-CASE 3 ; popen, pclose
-CASE 4 : FIFO writer
-CASE 5 : FIFO reader
+CASE 3 : use pipe for synchronization
+CASE 4 ; popen (read), pclose
+CASE 5 : popen (write), pclose
+CASE 6 : FIFO writer
+CASE 7 : FIFO reader
+CASE 8 : IPC
 */
 
-#define CASE 3
+#define CASE 8
 
 #if CASE == 0
 #include <stdio.h>
@@ -135,10 +138,76 @@ int main(int argc, char *argv[])
     */
     int ret = write(fd[1], msg, strlen(msg));
     printf("write done with return: %d\n", ret);
-    
+
     return 0;
 }
 #elif CASE == 3
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[])
+{
+    int p_fd[2];
+
+    printf("parent start\n");
+
+    if (pipe(p_fd) != 0)
+    {
+        perror("pipe");
+        return -1;
+    }
+
+    switch (fork())
+    {
+    case -1:
+        /* error */
+        perror("fork");
+        return -2;
+        break;
+
+    case 0:
+        /* child close the read end */
+        if (close(p_fd[0]) == -1)
+        {
+            perror("child close");
+            exit(-3);
+        }
+        /* do something */
+        sleep(5);
+
+        printf("child closed the pipe\n");
+
+        /* close the write end */
+        if (close(p_fd[1]) == -1)
+        {
+            perror("child close");
+            exit(-3);
+        }
+
+        exit(12);
+        break;
+
+    default:
+        break;
+    }
+
+    /* parent close the write end */
+    if (close(p_fd[1]) == -1)
+    {
+        perror("parent close");
+        return -4;
+    }
+
+    char dummy[100];
+
+    read(p_fd[0], &dummy, 100);
+
+    printf("parent ready to run\n");
+
+    return 0;
+}
+#elif CASE == 4
 #include <stdio.h>
 
 /* using popen to run command passed via argument *argv[] */
@@ -146,9 +215,9 @@ int main(int argc, char *argv[])
 {
     FILE *file;
     /* run command */
-    file = popen(argv[1], "r");
+    file = popen("ls", "r");
 
-    if(file == NULL)
+    if (file == NULL)
     {
         perror("popen");
         return -1;
@@ -157,16 +226,45 @@ int main(int argc, char *argv[])
     char buffer[1024];
 
     /* print out the result */
-    while((fgets(buffer, sizeof(buffer), file)))
+    while ((fgets(buffer, sizeof(buffer), file)))
     {
-        printf("%s\n", buffer);
+        printf("%s", buffer);
     }
 
     /* close */
     pclose(file);
     return 0;
 }
-#elif CASE == 4
+#elif CASE == 5
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[])
+{
+    FILE *file;
+    /* run command */
+    file = popen("grep Hello", "w");
+
+    if (file == NULL)
+    {
+        perror("popen");
+        return -1;
+    }
+
+    fprintf(file, "Hello world!\n");
+    fprintf(file, "Hello world again!\n");
+
+    /* close */
+    pclose(file);
+    return 0;
+}
+#elif CASE == 6
+/*
+This example will reproduce communication between 2 processes:
+The writer:
+    write data to fifo named fifo_A_to_B
+    read data from fifo named fifo_B_to_A
+*/
 #include <stdio.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -174,33 +272,78 @@ int main(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-    mkfifo("/tmp/myfifo", 0666);
+    /* create fifo if it does not exist */
+    mkfifo("/tmp/fifo_A_to_B", 0666);
 
-    char buffer[512];
+    char buffer[512];                      /* buffer save data received */
+    const char *msg = "Hello from writer"; /* data to send */
 
-    int fd = open("/tmp/myfifo", O_WRONLY);
+    /* open fifo */
+    int fd = open("/tmp/fifo_A_to_B", O_WRONLY);
+    int fd1 = open("/tmp/fifo_B_to_A", O_RDONLY);
 
-    const char *msg = "Hello from writer";
-    write(fd, msg, strlen(msg));
-    write(fd, msg, strlen(msg));
+    /* the loop comunication */
+    while (1)
+    {
+        write(fd, msg, strlen(msg));
+
+        int n = read(fd1, buffer, sizeof(buffer) - 1);
+
+        buffer[n] = '\0';
+
+        printf("%s\n", buffer);
+        sleep(1);
+    }
 
     close(fd);
+    close(fd1);
     return 0;
 }
-#elif CASE == 5
+#elif CASE == 7
+/*
+This example will reproduce communication between 2 processes:
+The reader:
+    read data from fifo named fifo_A_to_B
+    write data to fifo named fifo_B_to_A
+*/
 #include <stdio.h>
 #include <fcntl.h>
+#include <string.h>
 
 int main(int argc, char *argv[])
 {
-    char buffer[256];
-    int fd = open("/tmp/myfifo", O_RDONLY);
+    /* create fifo if it does not exist */
+    mkfifo("/tmp/fifo_B_to_A", 0666);
 
-    int n = read(fd, buffer, sizeof(buffer) - 1);
+    char buffer[512];                      /* buffer save data received */
+    const char *msg = "Hello from reader"; /* data to send */
 
-    buffer[n] = '\0';
+    /* open fifo */
+    int fd = open("/tmp/fifo_A_to_B", O_RDONLY);
+    int fd1 = open("/tmp/fifo_B_to_A", O_WRONLY);
 
-    printf("%s\n", buffer);
+    /* the loop comunication */
+    while (1)
+    {
+        int n = read(fd, buffer, sizeof(buffer) - 1);
+
+        buffer[n] = '\0';
+
+        printf("%s\n", buffer);
+
+        write(fd1, msg, strlen(msg));
+        sleep(1);
+    }
+
+    close(fd);
+    close(fd1);
+    return 0;
+}
+#elif CASE == 8
+#include <sys/ipc.h>
+
+int main(int argc, char *argv[])
+{
     return 0;
 }
 #else
@@ -211,7 +354,7 @@ int main()
 {
     FILE *file = fopen("document.txt", "wb");
 
-    if(file == NULL)
+    if (file == NULL)
     {
         return -1;
     }
