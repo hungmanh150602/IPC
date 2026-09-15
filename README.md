@@ -1086,6 +1086,22 @@ ssize_t msgrcv(int msqid, void *msgp, size_t maxmsgsz, long msgtyp, int msgflg);
                             or –1 on error */
 ```
 
+`msgtyp` is the type field of message that receiver want to claim.
+
+`msgflg`  specifies the action to be taken if a message of the desired type is not on the queue. These are as follows:
+
+*  If (msgflg & IPC_NOWAIT) is non-zero, the calling thread shall return immediately with a return value of -1 and errno set to
+           [ENOMSG].
+
+*  If (msgflg & IPC_NOWAIT) is 0, the calling thread shall suspend execution until one of the following occurs:
+
+-  A message of the desired type is placed on the queue.
+-  The message queue identifier *msqid* is removed from the system; when this occurs, errno shall be set to [EIDRM] and -1 shall be returned.
+
+-  The calling thread receives a signal that is to be caught; in this case a message is not received and the calling thread resumes execution in the manner prescribed in sigaction(3p).
+
+If I don't want to wait, I can use `IPC_NOWAIT` to pass to `msgflg` argument.
+
 Example:
 
 ```c
@@ -1112,3 +1128,57 @@ int main(int argc, char *argv[])
     return 0;
 }
 ```
+
+### d. Block
+
+>**`msgsnd` is able to block**
+
+We have the limit of each message is 8192 bytes (by using `ipcs -l`).
+
+If queue currently has 8000 bytes. Then I send another 500 bytes, it lead to block.
+
+Because queue is full and `msgsnd` will block until receiver takes data out.
+
+```text
+msgsnd()                                            msgrcv()
+   |                                                    |
+   v                                                    v
+Queue full / insufficient space                 space available
+   |                                                    |
+   v                                                    v
+SLEEP                                               wake sender
+```
+
+### e. Delete queue
+
+Prototype:
+
+```c
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+```
+
+Example: `msgctl(msqid, IPC_RMID, NULL);`
+
+>**Some processes blocked on the queue may also be awakened and receive an error, depending on the specific system call or state.**
+
+## 5.2 POSIX Message Queue
+
+Header:
+
+```c
+#include <mqueue.h>
+```
+
+API:
+
+```c
+mq_open()
+mq_send()
+mq_receive()
+mq_close()
+mq_unlink()
+mq_getattr()
+mq_setattr()
+```
+
+### POSIX Message Queue has priority
