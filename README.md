@@ -847,6 +847,40 @@ Message Queue
 └──────────────────────────┘
 ```
 
+`ipc_perm` is a structure containing information that the kernel uses to manage the ownership and access control of an IPC object.
+
+Example we have:
+
+|Message Queue|
+|:---|
+|UID|
+|GID|
+|mode = 0666|
+
+**What does `0666` actually mean?**
+
+Each number is ​​represent for an object's permission when access to a message queue.
+
+|0|6|6|6|
+|:---|:---|:---|:---|
+||user|group|others|
+
+```text
+rwx rwx rwx = 111 111 111
+rw- rw- rw- = 110 110 110
+rwx --- --- = 111 000 000
+
+and so on...
+
+rwx = 111 in binary = 7
+rw- = 110 in binary = 6
+r-x = 101 in binary = 5
+r-- = 100 in binary = 4
+```
+
+Where of course, r stands for read and w for write then x means execute.  
+So `6` is read and write.
+
 ## 4.3 Configuration Limits
 
 Since System V IPC objects consume system resources, the kernel places various limits on each class of IPC object in order to prevent resources from being exhausted.
@@ -858,6 +892,22 @@ MSGMAX      /* the maximum size of a message */
 MSGMNB      /* the maximum size of a message queue */
 MSGMNI      /* limits the number message queues
                that a system/IPC namespace can have */
+```
+
+Similarly, Semaphore and Shared Memory also have limits.
+
+```c
+/* Semaphore */ 
+SEMMSL
+SEMMNS
+SEMOPM
+SEMMNI
+
+/* Shared Memory */
+SHMMAX
+SHMMIN
+SHMALL
+SHMMNI
 ```
 
 ## 4.4 Command with IPC
