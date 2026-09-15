@@ -863,7 +863,7 @@ Each number is ​​represent for an object's permission when access to a messa
 
 |0|6|6|6|
 |:---|:---|:---|:---|
-||user|group|others|
+|other mode|user|group|others|
 
 ```text
 rwx rwx rwx = 111 111 111
@@ -963,11 +963,29 @@ ipcrm -q <msg_id>
 
 # 5. Message: System V Message Queue, POSIX Message Queue
 
+**Compare Message Queue between System V and Posix**
+
+|                    | System V MQ             | POSIX MQ         |
+| :----------------- | :---------------------- | :--------------- |
+| Header             | `<sys/msg.h>`           | `<mqueue.h>`     |
+| create/open        | `msgget()`              | `mq_open()`      |
+| send               | `msgsnd()`              | `mq_send()`      |
+| receive            | `msgrcv()`              | `mq_receive()`   |
+| delete             | `msgctl(..., IPC_RMID)` | `mq_unlink()`    |
+| ID                 | `int`                   | `mqd_t`          |
+| Message type       | yes                     | not like SysV    |
+| Priority           | no                      | yes              |
+| Kernel object      | SysV IPC object         | POSIX MQ         |
+| blocking           | yes                     | yes              |
+| nonblocking        | yes                     | yes              |
+
 ## What is **message**?
 
 First, byte stream is a sequence of individual data bytes transmitted continuously over time; it does not distinguish between message 1 and message 2.
 
 Message Queue solve this problem.
+
+A Message Queue is an IPC mechanism that allows processes to exchange data in the form of independent messages.
 
 ## Why we need Message Queue?
 
@@ -996,3 +1014,101 @@ In message queues, the kernel provides an abstraction:
 This is the reason **message queue** suitable for application that have many command, message.
 
 ## 5.1 System V Message Queue
+
+### a. Create Message Queue
+
+```c
+#include <sys/types.h>
+#include <sys/msg.h>
+/* For portability */
+int msgget(key_t key, int msgflg);
+/* Returns message queue identifier on success,
+   or –1 on error */
+```
+
+Example:
+
+```c
+    key_t key = 1234;
+
+    int msg_id = msgget(key, IPC_CREAT | 0660);
+```
+
+### b. Send message to Message Queue
+
+Prototype:
+
+```c
+#include <sys/msg.h>
+/* For portability */
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+                            /* Returns 0 on success, or –1 on error */
+```
+
+```c
+int main(int argc, char *argv[])
+{
+    key_t key = 1234;
+
+    int msg_id = msgget(key, IPC_CREAT | 0660);
+
+    if (msg_id == -1)
+    {
+        perror("mssget");
+        return -1;
+    }
+
+    /* create message to send */
+    struct message msg1;
+    msg1.msg_type = 1;
+    strcpy(msg1.msg_text, "HiHiHi HeHeHe");
+
+    /* send message */
+    if (msgsnd(msg_id, &msg1, strlen(msg1.msg_text) + 1, 0) == -1)
+    {
+        perror("msgsnd");
+        return -3;
+    }
+
+    return 0;
+}
+```
+
+### c. Receive message
+
+Prototype:
+
+```c
+#include <sys/msg.h>
+/* For portability */
+ssize_t msgrcv(int msqid, void *msgp, size_t maxmsgsz, long msgtyp, int msgflg);
+                            /* Returns number of bytes copied into mtext field,
+                            or –1 on error */
+```
+
+Example:
+
+```c
+int main(int argc, char *argv[])
+{
+    key_t key = 1234;
+
+    int msg_id = msgget(key, IPC_CREAT | 0660);
+
+    if (msg_id == -1)
+    {
+        perror("mssget");
+        return -1;
+    }
+
+    /* receive message */
+    struct message receive;
+    if (msgrcv(msg_id, &receive, sizeof(receive.msg_text), 0, 0) == -1)
+    {
+        perror("msgrcv");
+        return -2;
+    }
+
+    return 0;
+}
+```

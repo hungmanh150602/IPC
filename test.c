@@ -8,7 +8,8 @@ CASE 4 ; popen (read), pclose
 CASE 5 : popen (write), pclose
 CASE 6 : FIFO writer
 CASE 7 : FIFO reader
-CASE 8 : IPC
+CASE 8 : Message Queue system V
+CASE 9 : Message Queue Posix
 */
 
 #define CASE 8
@@ -343,14 +344,14 @@ int main(int argc, char *argv[])
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-
-struct ipc_perm per;
+#include <string.h>
+#include "type.h"
 
 int main(int argc, char *argv[])
 {
     key_t key = 1234;
 
-    int msg_id = msgget(key, IPC_CREAT | 0666);
+    int msg_id = msgget(key, IPC_CREAT | 0660);
 
     if (msg_id == -1)
     {
@@ -358,13 +359,37 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    printf("Key: %d\n", key);
-    printf("message ID: %d\n", msg_id);
+    /* create message to send */
+    struct message msg1;
+    // msg1.msg_type = 1;
+    strcpy(msg1.msg_text, "HiHiHi HeHeHe");
 
-    getchar();
+    /* send message */
+    if (msgsnd(msg_id, &msg1, strlen(msg1.msg_text) + 1, 0) == -1)
+    {
+        perror("msgsnd");
+        return -3;
+    }
+    /***********************************************************/
 
+    /* receive message */
+    struct message receive;
+    if (msgrcv(msg_id, &receive, sizeof(receive.msg_text), 0, 0) == -1)
+    {
+        perror("msgrcv");
+        return -2;
+    }
+
+    struct msqid_ds ds;
+    msgctl(msg_id, IPC_STAT, &ds);
+
+    /* print out information */
+    print_info(key, msg_id, &ds, receive.msg_text, NULL);
+
+    // getchar();
     return 0;
 }
+#elif CASE == 9
 #else
 #include <stdio.h>
 #include <string.h>
