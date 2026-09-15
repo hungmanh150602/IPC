@@ -748,11 +748,33 @@ int main(int argc, char *argv[])
 
 # 4. INTRODUCTION TO SYSTEM V IPC
 
+```text
+                 System V
+                     │
+                     ▼
+                 key_t key
+                     │
+           ┌─────────┼─────────┐
+           ▼         ▼         ▼
+        msgget()  semget()  shmget()
+           │         │         │
+           ▼         ▼         ▼
+         msgid     semid     shmid
+```
+
 ![alt text](image-6.png)
 
 ## 4.1 Keys and IPC Identifiers
 
-### a. Keys
+***Key*** is a value used to identify Tthe IPC object that the process wants to create or access.
+
+***IPC ID*** is used to perform after the object is found.
+
+**command to check Message Queue**
+
+```bash
+ipcs -q
+```
 
 IPC keys is an interger number used to determine the object which process wants to access.
 
@@ -768,18 +790,126 @@ Using either *IPC_PRIVATE* or `ftok()` is the usual technique.
 
 **Create unique key with *IPC_PRIVATE***
 
-`int msgid = msgget(key, IPC_CREAT | 0666);`
+```c
+int msgid = msgget(IPC_PRIVATE, 0666);
+```
 
 This technique is especially useful in multiprocess applications where the parent process creates the IPC object prior to performing a fork(), with the result that the child inherits the identifier of the IPC object.
 
 **Create using `ftok()`**
 
-`key_t ftok (const char *pathname, int proj_id);`
+```c
+key_t ftok(const char *pathname, int proj_id);
+```
 
 Return:
 
 - On success, the generated key_t value is returned.
 - On failure -1 is returned.
+
+After we have the key, we can use `msgget(), semget(), shmget()` to gain the IPC ID and use it to access to the object.
+
+## 4.2 Permission Structure
+
+```c
+/* Data structure used to pass permission information to IPC operations.
+   It follows the kernel ipc64_perm size so the syscall can be made directly
+   without temporary buffer copy.  However, since glibc defines the MODE
+   field as mode_t per POSIX definition (BZ#18231), it omits the __PAD1 field
+   (since glibc does not export mode_t as 16-bit for any architecture).  */
+struct ipc_perm
+{
+   __key_t __key;            /* Key.  */
+   __uid_t uid;              /* Owner's user ID.  */
+   __gid_t gid;              /* Owner's group ID.  */
+   __uid_t cuid;             /* Creator's user ID.  */
+   __gid_t cgid;             /* Creator's group ID.  */
+   __mode_t mode;            /* Read/write permission.  */
+   unsigned short int __seq; /* Sequence number.  */
+   unsigned short int __pad2;
+   __syscall_ulong_t __glibc_reserved1;
+   __syscall_ulong_t __glibc_reserved2;
+};
+```
+
+```text
+Message Queue
+┌──────────────────────────┐
+│ owner UID                │
+│ group GID                │
+│ permission mode          │
+│ creator UID              │
+│ creator GID              │
+│ queue size               │
+│ number of messages       │
+│ timestamps               │
+│ ...                      │
+└──────────────────────────┘
+```
+
+## 4.3 Configuration Limits
+
+Since System V IPC objects consume system resources, the kernel places various limits on each class of IPC object in order to prevent resources from being exhausted.
+
+**Some important limitations**
+
+```c
+MSGMAX      /* the maximum size of a message */
+MSGMNB      /* the maximum size of a message queue */
+MSGMNI      /* limits the number message queues
+               that a system/IPC namespace can have */
+```
+
+## 4.4 Command with IPC
+
+### see all IPC
+
+```bash
+ipcs
+```
+
+```text
+------ Message Queues --------
+key        msqid      owner      perms      used-bytes   messages    
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+
+------ Semaphore Arrays --------
+key        semid      owner      perms      nsems  
+```
+
+### see limit
+
+```bash
+ipcs -l
+```
+
+```text
+------ Messages Limits --------
+max queues system wide = 32000
+max size of message (bytes) = 8192
+default max size of queue (bytes) = 16384
+
+------ Shared Memory Limits --------
+max number of segments = 4096
+max seg size (kbytes) = 18014398509465599
+max total shared memory (kbytes) = 18446744073709551612
+min seg size (bytes) = 1
+
+------ Semaphore Limits --------
+max number of arrays = 32000
+max semaphores per array = 32000
+max semaphores system wide = 1024000000
+max ops per semop call = 500
+semaphore max value = 32767
+```
+
+### delete Message Queue
+
+```bash
+ipcrm -q <msg_id>
+```
 
 # 5. Message: System V Message Queue, POSIX Message Queue
 

@@ -340,10 +340,34 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 8
+#include <stdio.h>
 #include <sys/ipc.h>
+#include <sys/msg.h>
+
+struct ipc_perm per;
 
 int main(int argc, char *argv[])
 {
+    key_t key = 1234;
+    key_t key2 = 11234;
+
+    int msg_id = msgget(key, IPC_CREAT | 0666);
+    int msg_id1 = msgget(key2, IPC_CREAT | 0666);
+
+    if (msg_id == -1)
+    {
+        perror("mssget");
+        return -1;
+    }
+
+    printf("Key: %d\n", key);
+    printf("message ID: %d\n", msg_id);
+
+    printf("Key2: %d\n", key2);
+    printf("message ID 2: %d\n", msg_id1);
+
+    getchar();
+
     return 0;
 }
 #else
