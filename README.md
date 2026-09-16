@@ -1045,6 +1045,8 @@ int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
                             /* Returns 0 on success, or –1 on error */
 ```
 
+Example:
+
 ```c
 int main(int argc, char *argv[])
 {
@@ -1090,15 +1092,15 @@ ssize_t msgrcv(int msqid, void *msgp, size_t maxmsgsz, long msgtyp, int msgflg);
 
 `msgflg`  specifies the action to be taken if a message of the desired type is not on the queue. These are as follows:
 
-*  If (msgflg & IPC_NOWAIT) is non-zero, the calling thread shall return immediately with a return value of -1 and errno set to
+- If (msgflg & IPC_NOWAIT) is non-zero, the calling thread shall return immediately with a return value of -1 and errno set to
            [ENOMSG].
 
-*  If (msgflg & IPC_NOWAIT) is 0, the calling thread shall suspend execution until one of the following occurs:
+- If (msgflg & IPC_NOWAIT) is 0, the calling thread shall suspend execution until one of the following occurs:
 
--  A message of the desired type is placed on the queue.
--  The message queue identifier *msqid* is removed from the system; when this occurs, errno shall be set to [EIDRM] and -1 shall be returned.
+- A message of the desired type is placed on the queue.
+- The message queue identifier *msqid* is removed from the system; when this occurs, errno shall be set to [EIDRM] and -1 shall be returned.
 
--  The calling thread receives a signal that is to be caught; in this case a message is not received and the calling thread resumes execution in the manner prescribed in sigaction(3p).
+- The calling thread receives a signal that is to be caught; in this case a message is not received and the calling thread resumes execution in the manner prescribed in sigaction(3p).
 
 If I don't want to wait, I can use `IPC_NOWAIT` to pass to `msgflg` argument.
 
@@ -1221,13 +1223,13 @@ is a pointer to an mq_attr structure. This structure is defined in <bits/mqueue.
 ```c
 struct mq_attr
 {
-  __syscall_slong_t mq_flags;	    /* Message queue flags
+  __syscall_slong_t mq_flags;     /* Message queue flags
                                         [mq_getattr(), mq_setattr()] */
-  __syscall_slong_t mq_maxmsg;	    /* Maximum number of messages
+  __syscall_slong_t mq_maxmsg;     /* Maximum number of messages
                                         [mq_open(), mq_getattr()] */
-  __syscall_slong_t mq_msgsize;	    /* Maximum message size
+  __syscall_slong_t mq_msgsize;     /* Maximum message size
                                         [mq_open(), mq_getattr()] */
-  __syscall_slong_t mq_curmsgs;	    /* Number of messages currently queued
+  __syscall_slong_t mq_curmsgs;     /* Number of messages currently queued
                                         [mq_getattr()] */
 };
 ```
@@ -1399,3 +1401,127 @@ cat /dev/mqueue/name_msq
 ```bash
 rm /dev/mqueue/my_queue
 ```
+
+# 6. Shared Memory (System V) and Client/Server Properties
+
+**What is Shared Memory?**
+
+Shared Memory is a memory region managed by kernel, it allows multiple processes to access to a common data.
+
+**Why we need Shared Memory?**
+
+We have just explored message queues; when a sender wants to send data to a reader, it must go through the kernel. However, with shared memory, this is not necessary, as data is shared directly via a common memory area.
+
+## 6.1 Shared Memory (System V)
+
+In order to use a shared memory segment, we typically perform the following steps:
+
+- Call `shmget()` to create a new shared memory segment or obtain the identifier of an existing segment. This call returns a shared memory identifier for use in later calls.
+
+- Use `shmat()` to attach the shared memory segment; that is, make the segment part of the virtual memory of the calling process.
+
+At this point, the shared memory segment can be treated just like any other memory available to the program. In order to refer to the shared memory, the program uses the `addr` value returned by the `shmat()` call, which is a pointer to the start of the shared memory segment in the process’s virtual address space.
+
+```text
+                                  Kernel
+                                    │
+                            ┌───────▼────────┐
+                            │ Shared Memory  │
+                            │    Segment     │
+                            └───────┬────────┘
+                                    │
+                                ┌──────┴──────┐
+                                │             │
+                                ▼             ▼
+                            Process A      Process B
+                            shmat()        shmat()
+                                │             │
+                                ▼             ▼
+                            pointer A      pointer B
+```
+
+- Call `shmdt()` to detach the shared memory segment. After this call, the process can no longer refer to the shared memory. This step is optional, and happens automatically on process termination.
+
+- Call `shmctl()` to delete the shared memory segment. The segment will be destroyed only after all currently attached processes have detached it. Only one process needs to perform this step.
+
+### a. Create or Open a Shared Memory Segment
+
+Prototype:
+
+```c
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+int shmget(key_t key, size_t size, int shmflg);
+    /* Returns shared memory segment identifier on success,
+        or –1 on error */
+```
+
+### b. Using Shared Memory Segment
+
+Prototype:
+
+```c
+#include <sys/shm.h>
+
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+        /* Returns address at which shared memory is attached on success,
+                or (void *) –1 on error */
+```
+
+- If `shmaddr` is NULL, then the segment is attached at a suitable address selected by the kernel. This is **the preferred method** of attaching a segment.
+- If `shmaddr` is not NULL, and `SHM_RND` is not set, then the segment is attached at the address specified by `shmaddr`, which must be a multiple of the system page size (or the error EINVAL results).
+- If `shmaddr` is not NULL, and `SHM_RND` is set, then the segment is mapped at the address provided in `shmaddr`, rounded down to the nearest multiple of the con-stant `SHMLBA` (shared memory low boundary address).
+
+### c. Detaching a Shared Memory Segment
+
+Prototype:
+
+```c
+#include <sys/shm.h>
+
+int shmdt(const void *shmaddr);
+        /* Returns 0 on success, or –1 on error */
+```
+
+### d. Control Shared Memory
+
+Prototype:
+
+```c
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+        /* Returns 0 on success, or –1 on error */
+```
+
+The `cmd` argument specifies the control operation to be performed.
+
+**Generic control operations**
+
+*IPC_RMID*  
+Mark the shared memory segment and its associated `shmid_ds` data structure for deletion. If no processes currently have the segment attached, deletion is immediate; otherwise, the segment is removed after all processes have detached from it
+
+*IPC_STAT*  
+Place a copy of the `shmid_ds` data structure associated with this shared memory segment in the buffer pointed to by `buf`.
+
+*IPC_SET*  
+Update selected fields of the `shmid_ds` data structure associated with this shared memory segment using values in the buffer pointed to by `buf`.
+
+### e. Shared Memory Associated Data Structure
+
+Each shared memory segment has an associated `shmid_ds` data structure of the following form:
+
+```c
+struct shmid_ds
+{
+    struct ipc_perm shm_perm; /* operation permission struct */
+    size_t shm_segsz;         /* size of segment in bytes */
+    __time_t shm_atime;       /* time of last shmat() */
+    __time_t shm_dtime;       /* time of last shmdt() */
+    __time_t shm_ctime;       /* time of last change by shmctl() */
+    __pid_t shm_cpid;         /* pid of creator */
+    __pid_t shm_lpid;         /* pid of last shmop */
+    shmatt_t shm_nattch;      /* number of current attaches */
+};
+```
+
+## 6.2 Shared Memory (Posix)

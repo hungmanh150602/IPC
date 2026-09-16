@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include <sys/msg.h>
 
+#define MESSAGE_KEY 1234
+#define SHARED_MEMORY_KEY 2354
+
+/* shared memory */
+#define SEGMENT_SIZE 128
+
 struct message
 {
     long msg_type;

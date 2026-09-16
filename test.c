@@ -8,11 +8,12 @@ CASE 4 ; popen (read), pclose
 CASE 5 : popen (write), pclose
 CASE 6 : FIFO writer
 CASE 7 : FIFO reader
-CASE 8 : Message Queue system V
+CASE 8 : Message Queue System V
 CASE 9 : Message Queue Posix
+CASE 10: Shared Memory System V
 */
 
-#define CASE 9
+#define CASE 10
 
 #if CASE == 0
 #include <stdio.h>
@@ -467,6 +468,33 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+#elif CASE == 10
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+int ret; /* stored the return value of function to check error */
+
+int main(int argc, char *argv[])
+{
+    /* generate the key */
+    key_t key = ftok("/tmp/myshare", 'A');
+    /* create the shared memory segment */
+    int shm_id = shmget(key, 4096, 0666 | IPC_CREAT);
+
+    if(shm_id == -1)
+    {
+        perror("shmget");
+        return -1;
+    }
+    printf("Shared memory id: %d\n", shm_id);
+    void *ptr = shmat(shm_id, NULL, 0);
+
+    *(int*)ptr = 23;
+
+    printf("Shared memory address: %p\n", ptr);
+    return 0;
+}
 #else
 #include <stdio.h>
 #include <string.h>
@@ -487,3 +515,5 @@ int main()
     return 0;
 }
 #endif
+
+// 900158380
