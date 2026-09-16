@@ -1329,7 +1329,35 @@ ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 - If we don’t know the value of the `mq_msgsize` attribute of a queue, we can obtain it using `mq_getattr()`.
 - If `msg_prio` is not NULL, then the priority of the received message is copied into the location pointed to by `msg_prio`.
 
-### e. Blocking
+### e. Closing, and Unlinking a Message Queue
+
+**Closing a message queue**
+
+The `mq_close()` function closes the message queue descriptor mqdes.
+
+```c
+#include <mqueue.h>
+
+int mq_close(mqd_t mqdes);
+        /* Returns 0 on success, or –1 on error */
+```
+
+- If the calling process has registered via `mqd_t mqdes` for message notification from the queue, then the notification registration is automatically removed, and another process can subsequently register for message notification from the queue.
+- A message queue descriptor is automatically closed when a process terminates or calls exec(). As with file descriptors, we should explicitly close message queue descriptors that are no longer required, in order to prevent the process from running out of message queue descriptors.
+- As `close()` for files, closing a message queue doesn’t delete it. For that purpose, we need `mq_unlink()`, which is the message queue analog of `unlink()`.
+
+**Removing a message queue**
+
+The `mq_unlink()` function removes the message queue identified by name, and marks the queue to be destroyed once all processes cease using it (this may mean immediately, if all processes that had the queue open have already closed it).
+
+```c
+#include <mqueue.h>
+
+int mq_unlink(const char *name);
+        /* Returns 0 on success, or –1 on error */
+```
+
+### f. Blocking
 
 **Blocking with `mq_send()`**
 If the message queue is already full, then a further `mq_send()` either blocks until space becomes available
