@@ -1181,4 +1181,162 @@ mq_getattr()
 mq_setattr()
 ```
 
-### POSIX Message Queue has priority
+Queue has the name. Example: `mqd_t mq = mq_open("/my_queue", ...)`.  
+The first character of name must be *'/'*:
+
+```text
+/my_queue
+/chat
+/robot_command
+/sensor_data
+```
+
+### a. Openning/Creating a message Queue
+
+Prototype:
+
+```c
+mqd_t mq_open (const char *__name, int __oflag, ...
+                /* mode_t mode, struct mq_attr *attr */)
+
+                /* Returns a message queue descriptor on success,
+                or (mqd_t) –1 on error */
+```
+
+- The `__name` argument identifies the message queue.
+- The `__oflag` argument is a bit mask that controls various aspects of the operation of
+`mq_open()`. The values that can be included in this mask are summarized in Table below:
+
+![alt text](image-7.png)
+
+- If `__oflag` includes O_CREAT, a new, empty queue is created if one with the given name doesn’t already exist.
+- If `__oflag` specifies both O_CREAT and O_EXCL, and a queue with the given name already exists, then
+mq_open() fails.
+
+### b. Message Attributes
+
+The `mq_open()`, `mq_getattr()`, and `mq_setattr()` functions all permit an argument that
+is a pointer to an mq_attr structure. This structure is defined in <bits/mqueue.h> as follows:
+
+```c
+struct mq_attr
+{
+  __syscall_slong_t mq_flags;	    /* Message queue flags
+                                        [mq_getattr(), mq_setattr()] */
+  __syscall_slong_t mq_maxmsg;	    /* Maximum number of messages
+                                        [mq_open(), mq_getattr()] */
+  __syscall_slong_t mq_msgsize;	    /* Maximum message size
+                                        [mq_open(), mq_getattr()] */
+  __syscall_slong_t mq_curmsgs;	    /* Number of messages currently queued
+                                        [mq_getattr()] */
+};
+```
+
+- Only some of the fields are used by each of the three functions. The fields used
+by each function are indicated in the comments accompanying the structure
+definition above.
+
+**Setting message queue attributes during queue creation**
+
+When we create a message queue with `mq_open()`, the following `mq_attr` fields determine the attributes of the queue:
+
+- The `mq_maxmsg` field defines the limit on the number of messages that can be placed on the queue `using mq_send()`. This value must be greater than 0.
+- The `mq_msgsize` field defines the upper limit on the size of each message that may be placed on the queue. This value must be greater than 0.
+
+Example:
+
+```c
+    struct mq_attr attr;
+
+    attr.mq_flags = O_CREAT;
+    attr.mq_maxmsg = 10;    /* maximum number of message */
+    attr.mq_msgsize = 50;   /* maximum message size */
+```
+
+**Retrieving message queue attributes**
+
+The `mq_getattr()` function returns an `mq_attr` structure containing information about the message queue description and the message queue associated with the descriptor `mqdes`.
+
+Prototype:
+
+```c
+#include <mqueue.h>
+
+int mq_getattr(mqd_t mqdes, struct mq_attr *attr);
+            /* Returns 0 on success, or –1 on error */
+```
+
+Example:
+
+```c
+mqd_t mq = mq_open("/hihi", O_CREAT);
+
+struct mq_attr attr;
+
+mq_getattr(mq, &attr);
+```
+
+We can receive the attributes of message queue `mq` stored in the memory region pointed by `attr`.
+
+**Modifying message queue attributes**
+
+The `mq_setattr()` function sets attributes of the message queue description associated with the message queue descriptor `mqdes`, and optionally returns information about the message queue.
+
+```c
+#include <mqueue.h>
+
+int mq_setattr(mqd_t mqdes, const struct mq_attr *newattr,
+                struct mq_attr *oldattr);
+                    /* Returns 0 on success, or –1 on error */
+```
+
+### c. Sending Message
+
+Prototype:
+
+```c
+int mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
+            unsigned int msg_prio);
+                        /* Returns 0 on success, or –1 on error */
+```
+
+Similar to System V, send message using Posix also has name `mqdes`, a pointer `msg_ptr` points to the memory region that stores the data wnat to send, length of message `msg_len`, and unlike the System V, each message has a nonnegative integer priority, specified by the `msg_prio` argument.
+
+**Priority of message**  
+Messages are ordered within the queue in descending order of priority.
+
+```text
+Message scd             P = 10
+Message cdsvf           P = 5
+Message avsdc           P = 2
+Message htrr            P = 1
+```
+
+- If an application doesn’t need to use message priorities, it is sufficient to always specify `msg_prio` as 0.
+
+### d. Receiving Message
+
+Prtotype:
+
+```c
+ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
+                    unsigned int *msg_prio);
+            /* Returns number of bytes in received message on success,
+                   or –1 on error */
+```
+
+- Regardless of the actual size of the message, `msg_len` must be greater than or equal to the `mq_msgsize` attribute of the queue; otherwise, `mq_receive()` fails with the error EMSGSIZE.
+- If we don’t know the value of the `mq_msgsize` attribute of a queue, we can obtain it using `mq_getattr()`.
+- If `msg_prio` is not NULL, then the priority of the received message is copied into the location pointed to by `msg_prio`.
+
+### e. Blocking
+
+**Blocking with `mq_send()`**
+If the message queue is already full, then a further `mq_send()` either blocks until space becomes available
+in the queue, or, if the O_NONBLOCK flag is in effect, fails immediately with the error
+EAGAIN.
+
+**Blocking with `mq_receive()`**
+If the message queue is currently empty, then `mq_receive()` either blocks until a
+message becomes available, or, if the O_NONBLOCK flag is in effect, fails immediately
+with the error EAGAIN.

@@ -12,7 +12,7 @@ CASE 8 : Message Queue system V
 CASE 9 : Message Queue Posix
 */
 
-#define CASE 8
+#define CASE 9
 
 #if CASE == 0
 #include <stdio.h>
@@ -341,6 +341,18 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 8
+/*
+/* Mode bits for `msgget', `semget', and `shmget'.  /
+#define IPC_CREAT	01000		/* Create key if key does not exist. /
+#define IPC_EXCL	02000		/* Fail if key exists.  /
+#define IPC_NOWAIT	04000		/* Return error on wait.  /
+
+/* Control commands for `msgctl', `semctl', and `shmctl'.  /
+#define IPC_RMID	0		/* Remove identifier.  /
+#define IPC_SET		1		/* Set `ipc_perm' options.  /
+#define IPC_STAT	2		/* Get `ipc_perm' options.  /
+*/
+
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -390,6 +402,23 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 9
+#include <mqueue.h>
+
+int main(int argc, char *argv[])
+{
+
+    struct mq_attr attr;
+
+    attr.mq_flags = O_CREAT;
+    attr.mq_maxmsg = 10;    /* maximum number of message */
+    attr.mq_msgsize = 50;   /* maximum message size */
+    
+    mqd_t mq = mq_open("/hihi", O_CREAT);
+    
+    mq_getattr(mq, &attr);
+
+    return 0;
+}
 #else
 #include <stdio.h>
 #include <string.h>
