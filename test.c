@@ -402,20 +402,18 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 9
+#include <stdio.h>
 #include <mqueue.h>
 
 int main(int argc, char *argv[])
 {
-
-    struct mq_attr attr;
-
-    attr.mq_flags = O_CREAT;
-    attr.mq_maxmsg = 10;    /* maximum number of message */
-    attr.mq_msgsize = 50;   /* maximum message size */
-    
     mqd_t mq = mq_open("/hihi", O_CREAT);
-    
-    mq_getattr(mq, &attr);
+
+    if(mq == -1)
+    {
+        perror("mq_oepn");
+        return -1;
+    }
 
     return 0;
 }

@@ -1196,7 +1196,7 @@ The first character of name must be *'/'*:
 Prototype:
 
 ```c
-mqd_t mq_open (const char *__name, int __oflag, ...
+mqd_t mq_open(const char *__name, int __oflag, ...
                 /* mode_t mode, struct mq_attr *attr */)
 
                 /* Returns a message queue descriptor on success,
@@ -1274,6 +1274,11 @@ mqd_t mq = mq_open("/hihi", O_CREAT);
 struct mq_attr attr;
 
 mq_getattr(mq, &attr);
+
+printf("flags   = %ld\n", attr.mq_flags);
+printf("maxmsg  = %ld\n", attr.mq_maxmsg);
+printf("msgsize = %ld\n", attr.mq_msgsize);
+printf("curmsgs = %ld\n", attr.mq_curmsgs);
 ```
 
 We can receive the attributes of message queue `mq` stored in the memory region pointed by `attr`.
@@ -1368,3 +1373,29 @@ EAGAIN.
 If the message queue is currently empty, then `mq_receive()` either blocks until a
 message becomes available, or, if the O_NONBLOCK flag is in effect, fails immediately
 with the error EAGAIN.
+
+### g. Command with Posix Message Queue
+
+**See the location of message**
+
+```bash
+mount | grep mqueue
+```
+
+**See list of message**
+
+```bash
+ls -l /dev/mqueue/
+```
+
+**See the information inside the message**
+
+```bash
+cat /dev/mqueue/name_msq
+```
+
+**delete queue**
+
+```bash
+rm /dev/mqueue/my_queue
+```
