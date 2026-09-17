@@ -9,19 +9,25 @@ int main(int argc, char *argv[])
 {
     /* generate the key */
     key_t key = ftok("/tmp/myshare", 'A');
-    /* create the shared memory segment */
-    int shm_id = shmget(key, SEGMENT_SIZE, 0666 | IPC_CREAT);
 
-    if(shm_id == -1)
+    /* create the shared memory segment */
+    int shm_id = shmget(SHARED_MEMORY_KEY, SEGMENT_SIZE, 0666 | IPC_CREAT);
+
+    if (shm_id == -1)
     {
         perror("shmget");
         return -1;
     }
     printf("Shared memory id: %d\n", shm_id);
-    void *ptr = shmat(shm_id, NULL, 0);
 
+    /* attach */
+    struct data *ptr = shmat(shm_id, NULL, 0);
     printf("Shared memory address: %p\n", ptr);
-    printf("Value: %s\n", (char *)ptr);
+
+    printf("Value:\n");
+    printf("x: %d\n", ptr->x);
+    printf("y: %f\n", ptr->y);
+    printf("c: %s\n", ptr->c);
 
     /* detach */
     if (shmdt(ptr) == -1)
@@ -30,6 +36,5 @@ int main(int argc, char *argv[])
     }
 
     getchar();
-    shmctl(shm_id, IPC_RMID, NULL);
     return 0;
 }

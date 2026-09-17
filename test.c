@@ -11,9 +11,11 @@ CASE 7 : FIFO reader
 CASE 8 : Message Queue System V
 CASE 9 : Message Queue Posix
 CASE 10: Shared Memory System V
+CASE 11 : client/server shared memory
+CASE 12 : System V Semaphore
 */
 
-#define CASE 10
+#define CASE 12
 
 #if CASE == 0
 #include <stdio.h>
@@ -470,48 +472,109 @@ int main(int argc, char *argv[])
 }
 #elif CASE == 10
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <unistd.h>
+#include "type.h"
+#include <string.h>
 
-int ret; /* stored the return value of function to check error */
+int main(void)
+{
+    int shmid;
+
+    /* 1. Create shared memory */
+    shmid = shmget(SHARED_MEMORY_KEY, SEGMENT_SIZE, IPC_CREAT | 0666);
+
+    if (shmid == -1)
+    {
+        perror("shmget");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("shmid = %d\n", shmid);
+
+    /* 2. Attach */
+    struct data *ptr = shmat(shmid, NULL, 0);
+
+    if (ptr == (void *)-1)
+    {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
+
+    /* 3. Use shared memory */
+    ptr->x = 10;
+    ptr->y = 12.4;
+    strcpy(ptr->c, "Hello from shared memory");
+
+    /* 4. Get metadata */
+    struct shmid_ds ds;
+
+    if (shmctl(shmid, IPC_STAT, &ds) == -1)
+    {
+        perror("shmctl IPC_STAT");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Size     = %zu bytes\n", ds.shm_segsz);
+    printf("Attached = %lu\n", (unsigned long)ds.shm_nattch);
+    printf("Creator  = %ld\n", (long)ds.shm_cpid);
+
+    /* 5. Detach */
+    if (shmdt(ptr) == -1)
+    {
+        perror("shmdt");
+        exit(EXIT_FAILURE);
+    }
+
+    getchar();
+    /* 6. Remove */
+    if (shmctl(shmid, IPC_RMID, NULL) == -1)
+    {
+        perror("shmctl IPC_RMID");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+#elif CASE == 11
+#elif CASE == 12
+#include "type.h"
+#include <stdio.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
 
 int main(int argc, char *argv[])
 {
-    /* generate the key */
-    key_t key = ftok("/tmp/myshare", 'A');
-    /* create the shared memory segment */
-    int shm_id = shmget(key, 4096, 0666 | IPC_CREAT);
+    int sem_id = semget(SEMAPHORE_KEY, 5, IPC_CREAT | 0660);
 
-    if(shm_id == -1)
+    if (sem_id == -1)
     {
-        perror("shmget");
+        perror("semget");
         return -1;
     }
-    printf("Shared memory id: %d\n", shm_id);
-    void *ptr = shmat(shm_id, NULL, 0);
+    printf("Semaphore id: %d\n", sem_id);
 
-    *(int*)ptr = 23;
-
-    printf("Shared memory address: %p\n", ptr);
     return 0;
 }
 #else
 #include <stdio.h>
-#include <string.h>
+#include <sys/shm.h>
 
 int main()
 {
-    FILE *file = fopen("document.txt", "wb");
+    key_t key = 1;
 
-    if (file == NULL)
+    while (1)
     {
-        return -1;
+        int shm_id = shmget(key, 1073741824, IPC_CREAT | 0660);
+        void *ptr = shmat(shm_id, NULL, 0);
+
+        printf("allocated %d GB\n", key);
+        key++;
     }
-    const char *msg = "hehehehehe";
 
-    fwrite(msg, sizeof(char), strlen(msg), file);
-
-    fclose(file);
     return 0;
 }
 #endif

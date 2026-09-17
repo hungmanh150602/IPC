@@ -1408,6 +1408,12 @@ rm /dev/mqueue/my_queue
 
 Shared Memory is a memory region managed by kernel, it allows multiple processes to access to a common data.
 
+Shared memory does not mean two processes using the same memory region in RAM.
+
+Each process still has its Virtual Address Space.What is shared are the physical memory pages mapped into the virtual address space of each process.
+
+![alt text](image-8.png)
+
 **Why we need Shared Memory?**
 
 We have just explored message queues; when a sender wants to send data to a reader, it must go through the kernel. However, with shared memory, this is not necessary, as data is shared directly via a common memory area.
@@ -1423,13 +1429,13 @@ In order to use a shared memory segment, we typically perform the following step
 At this point, the shared memory segment can be treated just like any other memory available to the program. In order to refer to the shared memory, the program uses the `addr` value returned by the `shmat()` call, which is a pointer to the start of the shared memory segment in the process’s virtual address space.
 
 ```text
-                                  Kernel
-                                    │
-                            ┌───────▼────────┐
-                            │ Shared Memory  │
-                            │    Segment     │
-                            └───────┬────────┘
-                                    │
+                                     Kernel
+                                       │
+                               ┌───────▼────────┐
+                               │ Shared Memory  │
+                               │    Segment     │
+                               └───────┬────────┘
+                                       │
                                 ┌──────┴──────┐
                                 │             │
                                 ▼             ▼
@@ -1525,3 +1531,122 @@ struct shmid_ds
 ```
 
 ## 6.2 Shared Memory (Posix)
+
+## 6.3 Client/Server Properties
+
+**Why is it called Client/Server?**
+
+Conventions:
+
+```text
+Server
+
+- creating shared memory
+- setting up data structures
+- waiting for requests
+- processing requests
+- generating responses
+- managing the IPC lifecycle
+
+Client
+
+- locates the shared memory created by the server
+- attaches to it
+- writes the request
+- waits for the response
+- reads the response
+- detaches from it
+```
+
+**How does the server know when the client has finished writing?**
+
+We must design the protocol ourself.
+
+Example:
+
+```c
+struct data {
+    char request[20];
+    char response[20];
+    bool request_ready;
+    bool response_ready;
+};
+```
+
+# 7. Semaphore
+
+## 7.1 Semaphore System V
+
+A System V semaphore is a kernel IPC object used for synchronization between:
+
+- processes
+- threads within the same process
+- It is particularly common in multi-process models accessing shared memory.
+
+>**Shared memory allows processes to share data. Semaphores ensure they access that data in the correct order.**
+
+![alt text](image-9.png)
+
+The general steps for using a System V semaphore are the following:
+
+- Create or open a semaphore set using `semget()`.
+- Initialize the semaphores in the set using the `semctl()` SETVAL or SETALL operation. (Only one process should do this)
+- Perform operations on semaphore values using `semop()`. The processes using the semaphore typically use these operations to indicate acquisition and release of a shared resource.
+- When all processes have finished using the semaphore set, remove the set using the `semctl()` IPC_RMID operation. (Only one process should do this)
+
+**Posxi** typically operate on a semaphore object.  
+**System V** typically create semaphore set, there are more semaphore inside.
+
+![alt text](image-10.png)
+
+### a. Create or Opening a Semaphore set
+
+Prototype:
+
+```c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+int semget(key_t key, int nsems, int semflg);
+
+        /* Returns semaphore set identifier on success,
+            or –1 on error */
+```
+
+- `key` argument is a key generated using one of the methods: use the value IPC_PRIVATE or a key returned by `ftok()`.
+- `nsems` specifies the number of semaphores in that set, and must be greater than 0.
+- `semflg` argument is a bit mask specifying the permissions to be placed on a new semaphore set or checked against an existing set.
+
+Example:
+
+```c
+    key_t key = ftok("/tmp", 'A');
+
+    if (key == -1) {
+        perror("ftok");
+        exit(EXIT_FAILURE);
+    }
+
+    int semid = semget(key, 5, IPC_CREAT | 0666);
+
+    if (semid == -1) {
+        perror("semget");
+        exit(EXIT_FAILURE);
+    }
+```
+
+### b. Semaphore Control Operations
+
+Prototype:
+
+```c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+int semctl(int semid, int semnum, int cmd, ...);
+
+        /* Returns nonnegative integer on success (see text);
+            returns –1 on error */
+```

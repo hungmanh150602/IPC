@@ -6,9 +6,10 @@
 
 #define MESSAGE_KEY 1234
 #define SHARED_MEMORY_KEY 2354
+#define SEMAPHORE_KEY 3456
 
 /* shared memory */
-#define SEGMENT_SIZE 128
+#define SEGMENT_SIZE 2147483648
 
 struct message
 {

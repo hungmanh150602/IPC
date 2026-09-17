@@ -22,14 +22,12 @@ int main(int argc, char *argv[])
 
     /* attach */
     void *ptr = shmat(shm_id, NULL, 0);
+    printf("Shared memory address: %p\n", ptr);
 
     char msg[] = "Hello from writer.";
-
     memcpy(ptr, msg, sizeof(msg));
 
     // *(int *)ptr = 23;
-
-    printf("Shared memory address: %p\n", ptr);
 
     /* detach */
     if (shmdt(ptr) == -1)
