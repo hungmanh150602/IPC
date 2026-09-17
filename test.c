@@ -545,9 +545,13 @@ int main(void)
 #include <sys/sem.h>
 #include <sys/ipc.h>
 
+int ret;
+int num_sem = 5;
+unsigned short value[5];
+
 int main(int argc, char *argv[])
 {
-    int sem_id = semget(SEMAPHORE_KEY, 5, IPC_CREAT | 0660);
+    int sem_id = semget(SEMAPHORE_KEY, num_sem, IPC_CREAT | 0660);
 
     if (sem_id == -1)
     {
@@ -555,6 +559,33 @@ int main(int argc, char *argv[])
         return -1;
     }
     printf("Semaphore id: %d\n", sem_id);
+
+    ret = semctl(sem_id, 0, SETVAL, 12);
+
+    if (ret == -1)
+    {
+        perror("semctl");
+        return -1;
+    }
+
+    ret = semctl(sem_id, 0, GETVAL);
+    printf("%d\n", ret);
+
+    // for (int i = 0; i < num_sem; i++) {
+    //     printf("sem[%d] = %d\n", i, value[i]);
+    // }
+
+    struct sembuf sembuff = {
+        .sem_num = 0,
+        .sem_op = -4,
+        .sem_flg = 0};
+
+    semop(sem_id, &sembuff, 1);
+
+    ret = semctl(sem_id, 0, GETVAL);
+    printf("%d\n", ret);
+
+    semctl(sem_id, 0, IPC_RMID);
 
     return 0;
 }

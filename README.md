@@ -1645,8 +1645,111 @@ Prototype:
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-int semctl(int semid, int semnum, int cmd, ...);
+int semctl(int semid, int semnum, int cmd, union semun arg);
 
         /* Returns nonnegative integer on success (see text);
             returns –1 on error */
+```
+
+- `semnum` argument identifies a particular semaphore within the set
+- `cmd` argument specifies the operation to be performed.
+
+**Generic control operations**
+
+IPC_STAT : Place a copy of the `semid_ds` data structure associated with this semaphore set in the buffer pointed to by `arg.buf`.  
+
+IPC_SET : Update selected fields of the semid_ds data structure associated with this semaphore set using values in the buffer pointed to by arg.buf.  
+
+IPC_RMID : Immediately remove the semaphore set and its associated semid_ds data structure. Any processes blocked in `semop()` calls waiting on semaphores in this set are immediately awakened.
+
+**Retrieving and initializing semaphore values**
+
+SETVAL : set the value for a semaphore.  
+
+```c
+semctl(semid, 0, SETVAL, 1);
+```
+
+GETVAL : get the value of a semaphore.  
+
+```c
+int value = semctl(semid, 0, GETVAL);
+```
+
+SETALL : set all value for semaphore set.  
+
+```c
+unsigned short values[3];
+
+values[0] = 1;
+values[1] = 2;
+values[2] = 3; 
+
+semctl(semid, 0, SETALL, values);
+```
+
+GETALL : get all value of semaphore set into array.  
+
+```c
+unsigned short values[3];
+
+semctl(semid, 0, GETALL, values);
+```
+
+**Semaphore Associated Data Structure**
+Prototype:
+
+```c
+struct semid_ds
+{
+  struct ipc_perm sem_perm;   /* operation permission struct */
+  __time_t sem_otime;  /* last semop() time */
+  __syscall_ulong_t __sem_otime_high;
+  __time_t sem_ctime;  /* last time changed by semctl() */
+  __syscall_ulong_t __sem_ctime_high;
+  __syscall_ulong_t sem_nsems;    /* number of semaphores in set */
+  __syscall_ulong_t __glibc_reserved3;
+  __syscall_ulong_t __glibc_reserved4;
+};
+```
+
+### c. Semaphore Operations
+
+Prototype:
+
+```c
+#include <sys/sem.h>
+
+int semop (int semid, struct sembuf *sops, size_t nsops)
+
+            /* Returns 0 on success, or –1 on error */
+```
+
+- `sops` argument is a pointer points to an array that contains the operations to be performed.
+- `nsops` gives the size of this array (which must contain at least one element).
+
+The elements of the `sops` array are structures of the following form:
+
+```c
+struct sembuf
+{
+  unsigned short int sem_num; /* semaphore number */
+  short int sem_op; /* semaphore operation */
+  short int sem_flg; /* operation flag */
+};
+```
+
+- If `sem_op` is greater than 0, the value of `sem_op` is added to the semaphore value.
+- If `sem_op` equals 0, the value of the semaphore is checked to see whether it currently equals 0. If it does, the operation completes immediately; otherwise, `semop()` blocks until the semaphore value becomes 0.
+- If `sem_op` is less than 0, decrease the value of the semaphore by the amount specified in `sem_op`. If the current value of the semaphore is greater than or equal to the absolute value of `sem_op`, the operation completes immediately. Otherwise, `semop()` blocks until the semaphore value has been increased to a level that permits the operation to be performed without resulting in a negative value.
+
+Example:
+
+```c
+    struct sembuf sembuff;
+    sembuff.sem_num = 0;
+    sembuff.sem_op = 0;
+    sembuff.sem_flg = 0;
+
+    semop(sem_id, &sembuff, 1);
 ```
