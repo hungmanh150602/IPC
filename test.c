@@ -13,9 +13,10 @@ CASE 9 : Message Queue Posix
 CASE 10: Shared Memory System V
 CASE 11 : client/server shared memory
 CASE 12 : System V Semaphore
+CASE 13 : Signal
 */
 
-#define CASE 12
+#define CASE 6
 
 #if CASE == 0
 #include <stdio.h>
@@ -586,6 +587,48 @@ int main(int argc, char *argv[])
     printf("%d\n", ret);
 
     semctl(sem_id, 0, IPC_RMID);
+
+    return 0;
+}
+#elif CASE == 13
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <string.h>
+
+char *buff = NULL;
+
+void signal_handler(int sig)
+{
+    switch (sig)
+    {
+    case SIGINT:
+        buff = "signal SIGINT have received\n";
+        write(STDOUT_FILENO, buff, strlen(buff));
+        raise(SIGTERM);
+        break;
+
+    case SIGTERM:
+        buff = "signal SIGTERM have received\n";
+        write(STDOUT_FILENO, buff, strlen(buff));
+        raise(SIGKILL);
+        break;
+
+    default:
+        break;
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    pid_t pid = getpid();
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    while (1)
+    {
+        printf("process is running\n");
+        sleep(1);
+    }
 
     return 0;
 }

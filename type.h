@@ -9,7 +9,7 @@
 #define SEMAPHORE_KEY 3456
 
 /* shared memory */
-#define SEGMENT_SIZE 2147483648
+#define SEGMENT_SIZE 1024
 
 struct message
 {
@@ -17,11 +17,18 @@ struct message
     char msg_text[128];
 };
 
+struct fifo_message
+{
+    int msg_id;
+    int length;
+    char msg_text[128];
+};
+
 struct data
 {
     float y;
-    int x;
-    char c[20];
+    int money;
+    char text[20];
 };
 
 void print_info(int key, int msg_id, const struct msqid_ds *ds,
@@ -50,8 +57,8 @@ void print_info(int key, int msg_id, const struct msqid_ds *ds,
     if (_data != NULL)
     {
         printf("%.4f\n", _data->y);
-        printf("%d\n", _data->x);
-        printf("%s\n", _data->c);
+        printf("%d\n", _data->money);
+        printf("%s\n", _data->text);
     }
     return;
 }

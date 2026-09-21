@@ -1753,3 +1753,70 @@ Example:
 
     semop(sem_id, &sembuff, 1);
 ```
+
+# 8. Signal
+
+>**Signal is a synchronous notification mechansim of kernel, used to inform a process that specific event has occurred.**
+
+Signal typically use for:
+
+- notification
+- asynchronous event
+- process control
+- timer
+- termination
+- synchronization đơn giản
+
+Some basic signal:
+
+| Signal    | Meaning                              |
+| --------- | ------------------------------------ |
+| `SIGINT`  | Interrupt, usually Ctrl+C            |
+| `SIGTERM` | Termination request                  |
+| `SIGKILL` | Immediate kill                       |
+| `SIGSTOP` | Stop process                         |
+| `SIGCONT` | Continue process                     |
+| `SIGCHLD` | Child process state change           |
+| `SIGALRM` | Alarm timer expiration               |
+| `SIGUSR1` | User-defined                         |
+| `SIGUSR2` | User-defined                         |
+| `SIGSEGV` | Invalid memory access                |
+| `SIGPIPE` | Write to pipe/socket with no reader  |
+| `SIGQUIT` | Ctrl+\                               |
+
+Notably, `SIGKILL`, `SIGSTOP` cannot be *caught, ignored, or blocked* by the process.
+
+***OVERVIEW***
+
+```text
+                         SIGNAL
+                           |
+       +-------------------+-------------------+
+       |                   |                   |
+    CONCEPT             SENDING             HANDLING
+       |                   |                   |
+       |              +----+----+              |
+       |              |         |              |
+       |            kill()    raise()          |
+       |                                         |
+       |                                    sigaction()
+       |
+       +------ Signal state
+                   |
+          +--------+--------+
+          |        |        |
+        Blocked Pending Disposition
+          |        |
+          |        |
+    sigprocmask  sigpending
+          |
+          v
+      Signal Sets
+          |
+   +------+------+------+------+
+   |      |      |      |      |
+empty  fill    add    del   member
+   |
+   v
+sigsuspend()
+```
