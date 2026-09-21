@@ -5,7 +5,7 @@ CASE 2 : Shared memory System V
 CASE 3 : FIFOs
 */
 
-#define CASE 3
+#define CASE 2
 
 #if CASE == 0
 #include <stdio.h>
@@ -207,67 +207,112 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 3
+/*
+This example will reproduce communication between 2 processes:
+The writer:
+    write data to fifo named fifo_A_to_B
+    read data from fifo named fifo_B_to_A
+*/
 #include <stdio.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
+#include <pthread.h>
 #include <signal.h>
 
-int fd_server;
-int fd_client1;
-int fd_client2;
+char buffer[512]; /* buffer save data received */
+char msg[512];    /* data to send */
 
-/* function handle the signal Ctrl + C */
+int fd_read;
+int fd_send;
+
+/* function handle signal Ctrl + C */
 void handle(int sig)
 {
-    close(fd_server);
-    close(fd_client1);
-    close(fd_client2);
+    /* close fd */
+    close(fd_read);
+    close(fd_send);
 
     exit(123);
+}
+
+/*
+function read the message entered via the keyboard then send to client
+*/
+void *read_input(void *arg)
+{
+    /* the loop comunication */
+    while (1)
+    {
+        /* get input message from keyboard */
+        if (fgets(msg, sizeof(msg), stdin) == NULL)
+        {
+            printf("ERROR: get input from keyboard.\n");
+            return -1;
+        }
+        msg[strcspn(msg, "\n")] = '\0';
+
+        write(fd_send, msg, strlen(msg));
+    }
+    return NULL;
+}
+
+/*
+function receive message sent from client
+*/
+void *rev_message(void *arg)
+{
+    while (1)
+    {
+        int n = read(fd_read, buffer, sizeof(buffer) - 1);
+
+        buffer[n] = '\0';
+
+        printf("%s\n", buffer);
+    }
+    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
     signal(SIGINT, handle);
+    
+    /* create fifo if it does not exist */
+    mkfifo("/tmp/fifo_A_to_B", 0666);
+    mkfifo("/tmp/fifo_B_to_A", 0666);
 
-    /* create fifo file */
-    mkfifo("/fifo_server", 0666);
-    mkfifo("/fifo_client1", 0666);
-    mkfifo("/fifo_client2", 0666);
+    /* open fifo */
+    fd_send = open("/tmp/fifo_A_to_B", O_WRONLY);
+    fd_read = open("/tmp/fifo_B_to_A", O_RDONLY);
 
-    /* open fifo file */
-    fd_server = open("/fifo_server", O_RDONLY);
-    fd_client1 = open("/fifo_client1", O_WRONLY);
-    fd_client2 = open("/fifo_client2", O_WRONLY);
+    pthread_t thread1, thread2;
 
-    char request[100];
-    char respond[100];
-
-    while (1)
+    /* create thread */
+    if (pthread_create(&thread1, NULL, read_input, NULL) != 0)
     {
-        /* Chuỗi ban đầu (cần là mảng ký tự có thể thay đổi được) */
-        int n = read(fd_server, request, sizeof(request) - 1);
-        request[n] = '\0';
+        printf("Error create thread 1.\n");
+        return -1;
+    }
 
-        /* Tìm vị trí của khoảng trắng đầu tiên trong chuỗi */
-        char *space_ptr = strchr(request, ' ');
+    if (pthread_create(&thread2, NULL, rev_message, NULL) != 0)
+    {
+        printf("Error create thread 2.\n");
+        return -1;
+    }
 
-        if (space_ptr != NULL)
-        {
-            /* Thay khoảng trắng thành ký tự kết thúc chuỗi '\0' để cắt phần 1 */
-            *space_ptr = '\0';
+    printf("server started.\n");
 
-            /* Phần thứ hai bắt đầu ngay sau vị trí khoảng trắng */
-            char *second_part = space_ptr + 1;
+    /* join thread */
+    if (pthread_join(thread1, NULL))
+    {
+        printf("Error join thread 1.\n");
+        return -1;
+    }
 
-            /* In kết quả hai phần */
-            printf("Phan thu nhat: %s\n", request);
-            printf("Phan thu hai: %s\n", second_part);
-        }
-        else
-        {
-            printf("No space found in the string.\n");
-        }
+    if (pthread_join(thread2, NULL))
+    {
+        printf("Error join thread 2.\n");
+        return -1;
     }
 
     return 0;

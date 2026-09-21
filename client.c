@@ -5,7 +5,7 @@ CASE 2 : Shared memory System V
 CASE 3 : FIFOs
 */
 
-#define CASE 3
+#define CASE 2
 
 #if CASE == 0
 #include <stdio.h>
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
         semop(sem_id, &sem_opr[0], 1);
         printf("client 1 received: %s\n", ptr->text);
         ptr->money -= 50;
-        strcpy(ptr->text, "client consume 50 money.");
+        sprintf(ptr->text, "client consume 50 money. Now left: %d", ptr->money);
         // printf("client consume 50 money. Now left: %d\n", ptr->money);
         semop(sem_id, &sem_opr[1], 1);
         sleep(1);
@@ -182,58 +182,109 @@ int main(int argc, char *argv[])
     return 0;
 }
 #elif CASE == 3
+/*
+This example will reproduce communication between 2 processes:
+The reader:
+    read data from fifo named fifo_A_to_B
+    write data to fifo named fifo_B_to_A
+*/
 #include <stdio.h>
+#include <sys/stat.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <string.h>
-#include "type.h"
+#include <pthread.h>
+#include <signal.h>
 
-int fd_server;
-int fd_client1;
+int fd_read;
+int fd_send;
 
-/* function handle the signal Ctrl + C */
+/* function handle signal Ctrl + C */
 void handle(int sig)
 {
-    close(fd_server);
-    close(fd_client1);
+    /* close fd */
+    close(fd_read);
+    close(fd_send);
 
     exit(123);
+}
+
+/*
+function read the message entered via the keyboard then send to client
+*/
+void *read_input(void *arg)
+{
+    char msg[512]; /* data to send */
+
+    /* the loop comunication */
+    while (1)
+    {
+        /* get input message from keyboard */
+        if (fgets(msg, sizeof(msg), stdin) == NULL)
+        {
+            printf("ERROR: get input from keyboard.\n");
+            return NULL;
+        }
+        msg[strcspn(msg, "\n")] = '\0';
+
+        write(fd_send, msg, strlen(msg));
+    }
+    return NULL;
+}
+
+/*
+function receive message sent from client
+*/
+void *rev_message(void *arg)
+{
+    char buffer[512]; /* buffer save data received */
+
+    while (1)
+    {
+        int n = read(fd_read, buffer, sizeof(buffer) - 1);
+
+        buffer[n] = '\0';
+
+        printf("%s\n", buffer);
+    }
+    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
     signal(SIGINT, handle);
 
-    /* open fifo file */
-    int fd_server = open("/fifo_server", O_RDONLY);
-    int fd_client1 = open("/fifo_client1", O_WRONLY);
+    /* open fifo */
+    fd_read = open("/tmp/fifo_A_to_B", O_RDONLY);
+    fd_send = open("/tmp/fifo_B_to_A", O_WRONLY);
 
-    char input[100];
-    struct fifo_message request;
-    struct fifo_message respond;
+    pthread_t thread1, thread2;
 
-    request.msg_id = 1;
-
-    while (1)
+    /* create thread */
+    if (pthread_create(&thread1, NULL, read_input, NULL) != 0)
     {
-        /* read command from keyboard */
-        if (fgets(input, sizeof(input), stdin) == NULL)
-        {
-            printf("ERROR: get input from keyboard.\n");
-            return -1;
-        }
-        input[strcspn(input, "\n")] = '\0';
-        sprintf(request.msg_text, "client1: %s", input);
+        printf("Error create thread 1.\n");
+        return -1;
+    }
 
-        request.length = strlen(request.msg_text);
+    if (pthread_create(&thread2, NULL, rev_message, NULL) != 0)
+    {
+        printf("Error create thread 2.\n");
+        return -1;
+    }
 
-        /* send command */
-        write(fd_server, request, sizeof(request));
+    printf("client started.\n");
 
-        /* receive respond */
-        int n = read(fd_client1, respond, sizeof(respond) - 1);
-        respond.msg_text[n] = '\0';
-        printf("Respond from server: %s\n", respond);
+    /* join thread */
+    if (pthread_join(thread1, NULL))
+    {
+        printf("Error join thread 1.\n");
+        return -1;
+    }
+
+    if (pthread_join(thread2, NULL))
+    {
+        printf("Error join thread 2.\n");
+        return -1;
     }
 
     return 0;

@@ -28,7 +28,7 @@ struct data
 {
     float y;
     int money;
-    char text[20];
+    char text[100];
 };
 
 void print_info(int key, int msg_id, const struct msqid_ds *ds,
